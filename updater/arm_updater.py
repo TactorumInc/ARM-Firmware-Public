@@ -318,7 +318,7 @@ class UpdaterGUI:
         self.repo = repo
         self.q = queue.Queue()
         self.releases = []
-        self.busy = False
+        self.tasks = set()                   # running task keys
         self.detected = None                 # (port, version, verified)
         root.title(f"ARM Firmware Updater  v{UPDATER_VERSION}")
         root.geometry("760x640")
@@ -372,7 +372,6 @@ class UpdaterGUI:
         self.log_box.tag_config("err", foreground="#b00")
         self.log_box.tag_config("ok", foreground="#080")
 
-        self._set_busy(False)
         self.log(f"Releases from github.com/{repo}")
         self.root.after(50, self._pump)
         self.load_releases()
@@ -392,12 +391,29 @@ class UpdaterGUI:
         self.log_box.see("end")
         self.log_box.configure(state="disabled")
 
-    def _set_busy(self, busy, status=""):
-        self.busy = busy
-        state = "disabled" if busy else "normal"
-        for w in (self.flash_btn, self.rel_refresh, self.port_detect):
-            w.configure(state=state)
-        self.status_lbl.configure(text=status)
+    # Fetching releases (network) and finding the device (serial) are
+    # independent and may overlap - both start at launch. Flashing owns the
+    # serial port and must run alone, so it locks every button.
+    BUTTONS = {"rel": "rel_refresh", "port": "port_detect", "flash": "flash_btn"}
+
+    def _task_start(self, key, status):
+        self.tasks.add(key)
+        self.status_lbl.configure(text=status, foreground="#000")
+        self._apply_button_states()
+
+    def _task_end(self, key, ok, msg):
+        self.tasks.discard(key)
+        if msg:
+            self.status_lbl.configure(text=msg, foreground="#080" if ok else "#b00")
+        self._apply_button_states()
+
+    def _apply_button_states(self):
+        flashing = "flash" in self.tasks
+        for key, attr in self.BUTTONS.items():
+            busy = flashing or key in self.tasks
+            getattr(self, attr).configure(state="disabled" if busy else "normal")
+        if self.tasks:
+            self.flash_btn.configure(state="disabled")
 
     def _pump(self):
         try:
@@ -414,20 +430,18 @@ class UpdaterGUI:
                 elif kind == "detected":
                     self._fill_detect(payload)
                 elif kind == "done":
-                    ok, msg = payload
-                    self._set_busy(False, msg)
-                    self.status_lbl.configure(foreground="#080" if ok else "#b00")
+                    key, ok, msg = payload
+                    self._task_end(key, ok, msg)
                     if not ok:
                         self.bar.configure(value=0)
         except queue.Empty:
             pass
         self.root.after(50, self._pump)
 
-    def _run(self, fn, status):
-        if self.busy:
+    def _run(self, key, fn, status):
+        if key in self.tasks or "flash" in self.tasks:
             return
-        self._set_busy(True, status)
-        self.status_lbl.configure(foreground="#000")
+        self._task_start(key, status)
         threading.Thread(target=fn, daemon=True).start()
 
     # --- releases ---
@@ -442,8 +456,8 @@ class UpdaterGUI:
                 self.log(f"Could not fetch releases: {e}", "err")
                 rels = []
             self.q.put(("releases", rels))
-            self.q.put(("done", (True, "")))
-        self._run(work, "Fetching releases...")
+            self.q.put(("done", ("rel", True, "")))
+        self._run("rel", work, "Fetching releases...")
 
     def _fill_releases(self, rels):
         self.releases = rels
@@ -483,8 +497,8 @@ class UpdaterGUI:
         def work():
             ports = [p[0] for p in list_candidate_ports()]
             self.q.put(("detected", (ports, autodetect(self.log))))
-            self.q.put(("done", (True, "")))
-        self._run(work, "Looking for the device...")
+            self.q.put(("done", ("port", True, "")))
+        self._run("port", work, "Looking for the device...")
 
     def _fill_detect(self, payload):
         ports, found = payload
@@ -539,23 +553,23 @@ class UpdaterGUI:
                     self.log("Flash finished but the device did not answer "
                              "<SYSTEM:PING> afterwards. Power-cycle it and "
                              "press 'Detect device'.", "err")
-                    self.q.put(("done", (False, "Flashed - device not answering")))
+                    self.q.put(("done", ("flash", False, "Flashed - device not answering")))
                     return
                 self.detected = (port, ver, True)
                 self.q.put(("detected", ([p[0] for p in list_candidate_ports()],
                                          self.detected)))
                 if ver == rel["version"]:
                     self.log(f"Success: device reports firmware v{ver}", "ok")
-                    self.q.put(("done", (True, f"Done - running v{ver}")))
+                    self.q.put(("done", ("flash", True, f"Done - running v{ver}")))
                 else:
                     self.log(f"Device reports v{ver} but the release is "
                              f"v{rel['version']} - the flash may not have taken.", "err")
-                    self.q.put(("done", (False, f"Version mismatch: v{ver}")))
+                    self.q.put(("done", ("flash", False, f"Version mismatch: v{ver}")))
             except Exception as e:                   # noqa: BLE001
                 self.log(f"FAILED: {e}", "err")
-                self.q.put(("done", (False, "Flash failed - see log")))
+                self.q.put(("done", ("flash", False, "Flash failed - see log")))
 
-        self._run(work, "Starting...")
+        self._run("flash", work, "Starting...")
 
 
 def main():
