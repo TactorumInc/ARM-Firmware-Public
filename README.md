@@ -14,7 +14,7 @@ download by hand.
    version, and shows the version currently installed. Pick one and click
    **Flash selected firmware**.
 
-That's it. The updater confirms the new version is running when it finishes.
+The updater confirms the new version is running when it finishes.
 You can move to any release, newer or older, the same way.
 
 Windows may show a SmartScreen warning the first time because the
