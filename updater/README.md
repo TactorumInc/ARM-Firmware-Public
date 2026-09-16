@@ -78,11 +78,66 @@ re-flashing a version you have used before is instant and works offline.
 | Flash succeeds, "device did not answer" afterwards | Power-cycle the device and click *Detect device* |
 | GitHub API error 403 | Rate limit (60 requests/hour unauthenticated). Wait a few minutes |
 
-## Building the executable
+## ARMJog.exe - testing the motors
+
+Releases also ship **`ARMJog.exe`**, a joystick-style jog GUI for the four
+motion axes (X, Y, X2, Z). It finds the device the same way the updater
+does; if nothing answers the protocol it asks you to pick the port.
+
+### Never hot-plug - read this first
+
+The motor drivers and the motor power supply must only ever be connected
+or disconnected with **everything switched off**:
+
+- **Never insert or remove a driver module** from its socket while the
+  carrier is powered.
+- **Never plug or unplug the DC end of the motor supply** (the lead into
+  the carrier) while the supply is switched on. Connect it cold, then
+  switch the supply on at the mains side; switch off at the mains side
+  before unplugging.
+- **Never connect or disconnect a motor** while its driver is powered.
+
+Making or breaking the motor rail under power produces a voltage spike -
+inductive kick from the motor windings and cable, inrush into the bulk
+capacitors - that exceeds the drivers' ratings and destroys them
+instantly, often with no visible sign until the axis is found dead. The
+firmware reports a `VM_RESET` event if it sees the rail cycle, but that is
+after the fact; the only protection is the order you do things in.
+
+### Procedure
+
+1. Everything off. Fit driver modules in the sockets of the axes you want,
+   connect the motors, connect the DC supply lead to the carrier.
+2. Switch the motor supply on (at the wall or its own switch), then
+   connect USB.
+3. Run `ARMJog.exe`. It finds the device.
+4. In **Axis settings**, untick *Connect* for any socket with no driver
+   fitted. The firmware leaves those axes disabled and the GUI ignores
+   their keys.
+5. Click **Connect**. The log shows `INIT: OK` and each connected axis's
+   configuration is read back into the fields.
+6. Set a small jog speed to start (1-2 mm/s). Click the Jog panel or press
+   Esc so keystrokes go to the window, then hold a key to move:
+   `← / →` X, `W / S` Y, `A / D` X2, `↑ / ↓` Z. Several axes can be held at
+   once. The position readout updates live; release to stop.
+7. Tune as needed - max speed, acceleration, run/hold current, StealthChop
+   (silent) per axis - then **Apply + Save to device** to persist it.
+8. Optional safety test: tick *Simulate comms fault*. Three seconds into a
+   jog the GUI stops talking; the firmware must stop the axis on its own
+   and a `HOST_TIMEOUT` event appears in the log. Use a low speed and clear
+   travel.
+9. Finished: **Disable all**, close the window, switch the supply off at the
+   mains side, *then* unplug anything.
+
+There is **no end-of-travel protection** on current hardware (limit
+switches are not active). Keep jog speeds modest and a hand near the power
+switch.
+
+## Building the executables
 
 From the private firmware repository:
 
 ```bash
 pip install pyinstaller esptool pyserial
-python scripts/build_updater.py        # -> release/ARMUpdater.exe
+python scripts/build_tools.py          # -> release/ARMUpdater.exe, ARMJog.exe
 ```
