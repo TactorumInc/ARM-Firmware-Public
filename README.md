@@ -23,14 +23,22 @@ executable is not code-signed: choose *More info* → *Run anyway*.
 Full details, the cross-platform Python version, and troubleshooting are in
 [`updater/README.md`](updater/README.md).
 
-## Testing the motors
+## Checking a board
 
-`ARMJog.exe` (on every release) jogs the four motion axes from the keyboard
-and is the way to check drivers, motors and wiring. **Before you use it,
-read the hot-plug warning** - the drivers are destroyed by connecting or
-disconnecting anything on the motor side under power. The full procedure,
-key map and safety notes are in
-[`updater/README.md`](updater/README.md#armjogexe---testing-the-motors).
+`ARMDiagnostic.exe` (on every release) is the bring-up tool. It works through
+the board a stage at a time - the controller, the load cell amplifier, the
+motor carrier, each motor driver and the motors themselves - and saves a
+report per board. Its **Motion** tab jogs the four axes from the keyboard and
+is the way to check drivers, motors and wiring. **Before you use it, read the
+hot-plug warning** - the drivers are destroyed by connecting or disconnecting
+anything on the motor side under power. The full procedure, key map and
+safety notes are in
+[`updater/README.md`](updater/README.md#armdiagnosticexe---bring-up-and-testing-the-motors).
+
+A **brand-new motor carrier** has no firmware of its own; the updater flashes
+only the controller. The diagnostic says so in its carrier stage and its
+STM32 tab does that first flash. Every later carrier update happens by itself
+when the software connects.
 
 ## Releases
 
@@ -44,7 +52,7 @@ carries:
 | `partitions_v<ver>.bin` | Partition table. Flash at `0x8000` |
 | `bootloader_v<ver>.bin` | Second-stage bootloader. Flash at `0x1000` |
 | `ARMUpdater.exe` | The updater (Windows) |
-| `ARMJog.exe` | Joystick jog GUI for the motion axes (Windows). Finds the device automatically; arrow keys / WASD jog X, Y, X2, Z |
+| `ARMDiagnostic.exe` | Bring-up and test tool (Windows). Checks the board stage by stage, saves a report, and jogs the motion axes from its Motion tab; finds the device automatically |
 
 Releases marked **pre-release** are development builds: functional, but not
 validated for production use.

@@ -78,11 +78,20 @@ re-flashing a version you have used before is instant and works offline.
 | Flash succeeds, "device did not answer" afterwards | Power-cycle the device and click *Detect device* |
 | GitHub API error 403 | Rate limit (60 requests/hour unauthenticated). Wait a few minutes |
 
-## ARMJog.exe - testing the motors
+## ARMDiagnostic.exe - bring-up and testing the motors
 
-Releases also ship **`ARMJog.exe`**, a joystick-style jog GUI for the four
-motion axes (X, Y, X2, Z). It finds the device the same way the updater
-does; if nothing answers the protocol it asks you to pick the port.
+Releases also ship **`ARMDiagnostic.exe`**, the bring-up tool: it checks
+the ESP32, the AD7730, the STM32 carrier, each motor driver and the motors
+stage by stage, saves a report per board, and its **Motion** tab is the
+joystick-style jog GUI for the four axes (X, Y, X2, Z). It finds the device
+the same way the updater does; if nothing answers the protocol it asks you
+to pick the port.
+
+Note for a **brand-new carrier**: the updater flashes only the ESP32. A
+factory-fresh STM32 has no firmware yet, and the diagnostic's STM32 stage
+will say so (`STM32 is blank … first flash needed`); its STM32 tab performs
+that first flash. After that, every later STM32 update is automatic on
+`INIT`.
 
 ### Never hot-plug - read this first
 
@@ -110,10 +119,10 @@ after the fact; the only protection is the order you do things in.
    connect the motors, connect the DC supply lead to the carrier.
 2. Switch the motor supply on (at the wall or its own switch), then
    connect USB.
-3. Run `ARMJog.exe`. It finds the device.
-4. In **Axis settings**, untick *Connect* for any socket with no driver
-   fitted. The firmware leaves those axes disabled and the GUI ignores
-   their keys.
+3. Run `ARMDiagnostic.exe` and open the **Motion** tab. It finds the device.
+4. In **Axis settings**, untick *Driver fitted* for any socket with no
+   driver fitted. The firmware leaves those axes disabled and the GUI
+   ignores their keys.
 5. Click **Connect**. The log shows `INIT: OK` and each connected axis's
    configuration is read back into the fields.
 6. Set a small jog speed to start (1-2 mm/s). Click the Jog panel or press
@@ -138,6 +147,6 @@ switch.
 From the private firmware repository:
 
 ```bash
-pip install pyinstaller esptool pyserial
-python scripts/build_tools.py          # -> release/ARMUpdater.exe, ARMJog.exe
+pip install pyinstaller esptool pyserial matplotlib
+python scripts/build_tools.py          # -> release/ARMUpdater.exe, ARMDiagnostic.exe
 ```
