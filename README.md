@@ -4,8 +4,7 @@ Firmware images for the ARM device, and the updater that installs them.
 
 ## Updating your device
 
-The easiest way is the **ARM Firmware Updater**: one window, no files to
-download by hand.
+The easiest way is the **ARM Firmware Updater**
 
 1. Get `ARMUpdater.exe` from the
    [latest release](https://github.com/TactorumInc/ARM-Firmware-Public/releases/latest).
