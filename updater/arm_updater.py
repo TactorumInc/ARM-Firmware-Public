@@ -167,12 +167,24 @@ def _ask(ser, cmd, seconds):
     return None
 
 
+def _open_quiet(port, baud):
+    """Open without moving DTR/RTS. They drive the ESP32's EN/GPIO0 through
+    the auto-reset circuit, and pyserial's default open/close toggles them
+    with skew: an intermittent reset, or a chip left silent in ROM download
+    mode. Only esptool's flash step wants the reset (it does its own)."""
+    ser = serial.serial_for_url(port, baud, timeout=0, do_not_open=True)
+    ser.dtr = False
+    ser.rts = False
+    ser.open()
+    return ser
+
+
 def query_device(port, attempts=2):
     """Return the firmware version string if an ARM device answers on port,
-    else None. Two attempts, because opening the port may have just reset
-    the ESP32 (auto-reset wiring) and it needs a moment to boot."""
+    else None. The open does not reset the board; the retries cover a board
+    that is still booting (after esptool's hard reset, or a re-plug)."""
     try:
-        ser = serial.Serial(port, DEVICE_BAUD, timeout=0)
+        ser = _open_quiet(port, DEVICE_BAUD)
     except (serial.SerialException, OSError):
         return None
     try:

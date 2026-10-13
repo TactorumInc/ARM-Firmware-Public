@@ -83,9 +83,9 @@ re-flashing a version you have used before is instant and works offline.
 Releases also ship **`ARMDiagnostic.exe`**, the bring-up tool: it checks
 the ESP32, the AD7730, the STM32 carrier, each motor driver and the motors
 stage by stage, saves a report per board, and its **Motion** tab is the
-joystick-style jog GUI for the four axes (X, Y, X2, Z). It finds the device
-the same way the updater does; if nothing answers the protocol it asks you
-to pick the port.
+joystick-style jog GUI for the four axes (C carriage, Y and X aim, Z
+stimulus). It finds the device the same way the updater does; if nothing
+answers the protocol it asks you to pick the port.
 
 Note for a **brand-new carrier**: the updater flashes only the ESP32. A
 factory-fresh STM32 has no firmware yet, and the diagnostic's STM32 stage
@@ -127,7 +127,7 @@ after the fact; the only protection is the order you do things in.
    configuration is read back into the fields.
 6. Set a small jog speed to start (1-2 mm/s). Click the Jog panel or press
    Esc so keystrokes go to the window, then hold a key to move:
-   `← / →` X, `W / S` Y, `A / D` X2, `↑ / ↓` Z. Several axes can be held at
+   `← / →` C, `W / S` Y, `A / D` X, `↑ / ↓` Z. Several axes can be held at
    once. The position readout updates live; release to stop.
 7. Tune as needed - max speed, acceleration, run/hold current, StealthChop
    (silent) per axis - then **Apply + Save to device** to persist it.
