@@ -11,11 +11,15 @@ ARM device on a serial port, and flashes the chosen release - no separate
 
 What "flash" does: connects to the ESP32 ROM bootloader through esptool
 (auto-reset via DTR/RTS, no button pressing), verifies the chip is an
-ESP32, and writes the release's *merged* image at offset 0x0. The merged
-image carries the bootloader, partition table and app together, so it is
-the right thing to write regardless of what was on the device before
-(including the pre-2.1.0 partition layout). Afterwards it reconnects at the
-application baud rate and asks the new firmware for its version.
+ESP32, and writes the release's *merged* image, which carries the bootloader,
+partition table and app together, so it is the right thing to write
+regardless of what was on the device before (including the pre-2.1.0
+partition layout). The image's data partitions (NVS, phy, coredump) are only
+0xFF padding, and writing them erased the device's saved settings - the load
+cell calibration, motor and stimulus settings - on every update before 1.1.0.
+They are skipped: only the bootloader, partition table and app regions are
+written. Afterwards it reconnects at the application baud rate and asks the
+new firmware for its version.
 
 Device detection: every serial port is asked <SYSTEM:PING> at 921600 baud;
 the one that answers with the ARM JSON protocol is the device. If none
@@ -41,7 +45,7 @@ from tkinter import ttk, scrolledtext, messagebox
 import serial
 from serial.tools import list_ports
 
-UPDATER_VERSION = "1.0.0"
+UPDATER_VERSION = "1.1.0"
 DEFAULT_REPO = "TactorumInc/ARM-Firmware-Public"
 RELEASES_URL = "https://api.github.com/repos/{repo}/releases?per_page=50"
 ASSET_RE = re.compile(r"^firmware-merged_v(.+)\.bin$")
@@ -282,8 +286,43 @@ class GuiLogger:
         self._progress(cur_iter, total_iters, prefix.strip() or "Writing")
 
 
+PARTITION_TABLE_OFFSET = 0x8000
+PART_TYPE_DATA = 0x01
+
+
+def flash_segments(image):
+    """Split a merged image (flashed at 0x0) into the (offset, bytes) pieces
+    to write: everything except the data partitions named by the image's own
+    partition table, so NVS (saved settings and calibration) survives. Pieces
+    that are only 0xFF padding are dropped. Raises ValueError when the image
+    has no readable partition table."""
+    skip = []
+    pos = PARTITION_TABLE_OFFSET
+    while pos + 32 <= min(len(image), PARTITION_TABLE_OFFSET + 0xC00):
+        entry = image[pos:pos + 32]
+        if entry[:2] != bytes((0xAA, 0x50)):   # 0xEBEB = MD5 entry, 0xFFFF = end
+            break
+        ptype = entry[2]
+        offset = int.from_bytes(entry[4:8], "little")
+        size = int.from_bytes(entry[8:12], "little")
+        if ptype == PART_TYPE_DATA:
+            skip.append((offset, offset + size))
+        pos += 32
+    if pos == PARTITION_TABLE_OFFSET:
+        raise ValueError("no partition table at 0x8000 in this image")
+    segments = []
+    start = 0
+    for lo, hi in sorted(skip) + [(len(image), len(image))]:
+        lo, hi = max(lo, start), min(max(hi, lo), len(image))
+        if lo > start:
+            segments.append((start, image[start:lo]))
+        start = max(start, hi)
+    return [(off, data) for off, data in segments if data.count(0xFF) != len(data)]
+
+
 def flash_image(port, path, log, progress):
-    """Write the merged image at 0x0 through esptool. Raises on failure."""
+    """Write the merged image through esptool, leaving the data partitions
+    (saved settings) alone. Raises on failure."""
     import esptool.logger as esplog
     from esptool import cmds
     from esptool.logger import TemplateLogger
@@ -309,9 +348,13 @@ def flash_image(port, path, log, progress):
         except Exception as e:                       # noqa: BLE001
             log(f"Could not raise baud rate ({e}); continuing at 115200")
         cmds.attach_flash(esp)
-        size = os.path.getsize(path)
-        log(f"Writing {os.path.basename(path)} ({size:,} bytes) at 0x0...")
-        cmds.write_flash(esp, [(0x0, path)], flash_mode="keep",
+        with open(path, "rb") as f:
+            image = f.read()
+        segments = flash_segments(image)
+        log(f"Writing {os.path.basename(path)} ({len(image):,} bytes): "
+            + ", ".join(f"{len(d):,} at 0x{o:X}" for o, d in segments)
+            + " - saved settings are kept")
+        cmds.write_flash(esp, segments, flash_mode="keep",
                          flash_freq="keep", flash_size="keep")
         log("Write complete, resetting device...")
         cmds.reset_chip(esp, "hard-reset")

@@ -9,10 +9,10 @@ USB. You never handle a `.bin` file.
 
 ## Windows: the standalone app
 
-1. Download **`ARMUpdater.exe`** from the latest release on the
+1. Download **`ARMUpdater_v<ver>.exe`** from the latest release on the
    [releases page](https://github.com/TactorumInc/ARM-Firmware-Public/releases).
 2. Plug the device in over USB.
-3. Run `ARMUpdater.exe`.
+3. Run it.
 
 On launch it fetches the release list and looks for the device on every
 serial port. When it finds it, the port is filled in and the firmware
@@ -60,10 +60,20 @@ recovered. It refuses to write if the chip is not an original ESP32.
 
 ## What gets written
 
-The release's `firmware-merged_v<ver>.bin` at flash offset 0x0. That single
-image contains the bootloader, partition table, and application, so it is
-correct whatever was on the device before - including devices from before
-v2.1.0, when the partition layout changed.
+The release's `firmware-merged_v<ver>.bin`, laid out from flash offset 0x0.
+That single image contains the bootloader, partition table, and application,
+so it is correct whatever was on the device before - including devices from
+before v2.1.0, when the partition layout changed.
+
+The device's saved settings are kept: the load cell calibration, motor and
+stimulus settings live in the NVS data partition, and the updater skips every
+data partition the image's partition table names (in the image they are only
+padding). Updater 1.0.0 wrote the whole image at 0x0, which erased them on
+every update; after updating with it, recalibrate the load cell and re-enter
+your settings. Flashing by hand keeps them too if you write the three parts
+instead of the merged image:
+
+    esptool --chip esp32 --port <COM> --baud 921600 write-flash 0x1000 bootloader_v<ver>.bin 0x8000 partitions_v<ver>.bin 0x10000 firmware_v<ver>.bin
 
 Downloads are cached in `%LOCALAPPDATA%\ARMUpdater\cache\<tag>\`, so
 re-flashing a version you have used before is instant and works offline.
@@ -78,9 +88,9 @@ re-flashing a version you have used before is instant and works offline.
 | Flash succeeds, "device did not answer" afterwards | Power-cycle the device and click *Detect device* |
 | GitHub API error 403 | Rate limit (60 requests/hour unauthenticated). Wait a few minutes |
 
-## ARMDiagnostic.exe - bring-up and testing the motors
+## ARMDiagnostic - bring-up and testing the motors
 
-Releases also ship **`ARMDiagnostic.exe`**, the bring-up tool: it checks
+Releases also ship **`ARMDiagnostic_v<ver>.exe`**, the bring-up tool: it checks
 the ESP32, the AD7730, the STM32 carrier, each motor driver and the motors
 stage by stage, saves a report per board, and its **Motion** tab is the
 joystick-style jog GUI for the four axes (C carriage, Y and X aim, Z
@@ -119,7 +129,7 @@ after the fact; the only protection is the order you do things in.
    connect the motors, connect the DC supply lead to the carrier.
 2. Switch the motor supply on (at the wall or its own switch), then
    connect USB.
-3. Run `ARMDiagnostic.exe` and open the **Motion** tab. It finds the device.
+3. Run `ARMDiagnostic_v<ver>.exe` and open the **Motion** tab. It finds the device.
 4. In **Axis settings**, untick *Driver fitted* for any socket with no
    driver fitted. The firmware leaves those axes disabled and the GUI
    ignores their keys.

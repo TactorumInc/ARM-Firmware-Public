@@ -6,7 +6,7 @@ Firmware images for the ARM device, and the updater that installs them.
 
 The easiest way is the **ARM Firmware Updater**
 
-1. Get `ARMUpdater.exe` from the
+1. Get `ARMUpdater_v<ver>.exe` from the
    [latest release](https://github.com/TactorumInc/ARM-Firmware-Public/releases/latest).
 2. Plug the device in over USB.
 3. Run the updater. It finds the device, lists every published firmware
@@ -24,7 +24,7 @@ Full details, the cross-platform Python version, and troubleshooting are in
 
 ## Checking a board
 
-`ARMDiagnostic.exe` (on every release) is the bring-up tool. It works through
+`ARMDiagnostic_v<ver>.exe` (on every release) is the bring-up tool. It works through
 the board a stage at a time - the controller, the load cell amplifier, the
 motor carrier, each motor driver and the motors themselves - and saves a
 report per board. Its **Motion** tab jogs the four axes from the keyboard and
@@ -46,12 +46,12 @@ carries:
 
 | File | What it is |
 |---|---|
-| `firmware-merged_v<ver>.bin` | Complete image (bootloader + partition table + app). Flash at `0x0`. **This is what the updater uses.** |
+| `firmware-merged_v<ver>.bin` | Complete image (bootloader + partition table + app), laid out from `0x0`. **This is what the updater uses** (it skips the settings area). |
 | `firmware_v<ver>.bin` | Application only. Flash at `0x10000` |
 | `partitions_v<ver>.bin` | Partition table. Flash at `0x8000` |
 | `bootloader_v<ver>.bin` | Second-stage bootloader. Flash at `0x1000` |
-| `ARMUpdater.exe` | The updater (Windows) |
-| `ARMDiagnostic.exe` | Bring-up and test tool (Windows). Checks the board stage by stage, saves a report, and jogs the motion axes from its Motion tab; finds the device automatically |
+| `ARMUpdater_v<ver>.exe` | The updater (Windows) |
+| `ARMDiagnostic_v<ver>.exe` | Bring-up and test tool (Windows). Checks the board stage by stage, saves a report, and jogs the motion axes from its Motion tab; finds the device automatically |
 
 Releases marked **pre-release** are development builds: functional, but not
 validated for production use.
@@ -63,11 +63,17 @@ directly:
 
 ```bash
 pip install esptool
-esptool --chip esp32 --port COM7 --baud 921600 write-flash 0x0 firmware-merged_v<ver>.bin
+esptool --chip esp32 --port COM7 --baud 921600 write-flash 0x1000 bootloader_v<ver>.bin 0x8000 partitions_v<ver>.bin 0x10000 firmware_v<ver>.bin
 ```
 
-Always use the merged image at `0x0` unless you know the device already has
-the current partition table (it changed in v2.1.0).
+This writes the bootloader, partition table and application and leaves the
+device's saved settings alone (load cell calibration, motor and stimulus
+settings). Writing `firmware-merged_v<ver>.bin` at `0x0` instead also works,
+but erases those settings.
+
+**Updaters before 1.1.0 (shipped with v2.3.1) erased the saved settings on
+every update.** After updating with one, calibrate the load cell again and
+re-enter your settings.
 
 ## After flashing
 
